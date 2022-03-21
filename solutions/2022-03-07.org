@@ -61,6 +61,9 @@
       toPoly :: Num n => [n] -> Poly n
       toPoly = Poly . foldr (\x -> (<> [x])) []
 
+      terms :: Poly n -> [Term n]
+      terms = zipWith Term [0..] . coerce
+
       showTerm' :: (Num n, Eq n, Show n) => Term n -> [String]
       showTerm' Term{exp,     coeff = 0} = []
       showTerm' Term{exp = 0, coeff}     = [show coeff]
@@ -68,7 +71,7 @@
 
       instance (Num n, Eq n, Show n) => Show (Poly n) where
         show =
-          unwords . intersperse "+" . foldr (flip (<>) . showTerm') [] . zipWith Term [0..] . unPoly
+          unwords . intersperse "+" . foldr (flip (<>) . showTerm') [] . terms
 
       addTerm :: forall a. Num a => Maybe a -> Maybe a -> Maybe a
       addTerm x y = coerce @(Maybe (Sum a)) (coerce x <> coerce y)
@@ -76,14 +79,15 @@
       addPoly :: Num n => Poly n -> Poly n -> Poly n
       addPoly (Poly p1) (Poly p2) =
         Poly (catMaybes (takeWhile isJust (zipWith addTerm (fill p1) (fill p2))))
+
         where fill p = fmap Just p <> repeat Nothing
 
       evalTerm :: Num n => n -> Term n -> n
       evalTerm v Term{exp,coeff} = coeff * (v ^ exp)
 
       evalPoly :: Num n => Poly n -> n -> n
-      evalPoly (Poly p) x =
-        coerce (foldMap (Sum . evalTerm x) (zipWith Term [0..] p))
+      evalPoly p x =
+        coerce (foldMap (Sum . evalTerm x) (terms p))
     #+end_src
 
 * Examples
@@ -122,7 +126,7 @@
       Poly (replicate exp 0 <> fmap (* coeff) (coerce p))
 
     distributePoly :: Num n => Poly n -> Poly n -> [Poly n]
-    distributePoly p1 p2 = distributeTerm p2 <$> zipWith Term [0..] (coerce p1)
+    distributePoly p1 p2 = distributeTerm p2 <$> terms p1
 
     multPoly :: forall n. Num n => Poly n -> Poly n -> Poly n
     multPoly p1 p2 =
@@ -138,7 +142,7 @@
       (+) = addPoly
       (*) = multPoly
       fromInteger = Poly . pure . fromInteger
-      negate (Poly p) = Poly (fmap negate p)
+      negate = Poly . fmap negate . coerce
        -- I don't know what these two are
       abs = undefined
       signum = undefined
