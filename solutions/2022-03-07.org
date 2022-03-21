@@ -3,13 +3,16 @@
 * Poor Polynomials
 
   #+begin_src haskell :session none
-    {-# LANGUAGE ViewPatterns #-}
+    {-# LANGUAGE TypeApplications #-}
+    {-# LANGUAGE NamedFieldPuns #-}
 
     module Poly where
   #+end_src
 
   #+begin_src haskell
+    import Prelude hiding (exp)
     import Data.Coerce (coerce)
+    import Data.Foldable (fold)
     import Data.Monoid (Sum (..))
     import Data.List (intersperse, foldl')
     import Data.Maybe (catMaybes, isJust)
@@ -30,6 +33,8 @@
 
   #+begin_src haskell
     newtype Poly = Poly {unPoly :: [Int]}
+
+    data Term = Term {exp, coeff :: Int}
   #+end_src
 
 * Properties of ~Poly~
@@ -52,29 +57,29 @@
       toPoly :: [Int] -> Poly
       toPoly = Poly . foldr (\x -> (<> [x])) []
 
-      showTerm :: Int -> Int -> [String]
-      showTerm exp 0     = []
-      showTerm 0   coeff = [show coeff]
-      showTerm exp coeff = [show coeff <> "x^" <> show exp]
+      showTerm' :: Term -> [String]
+      showTerm' Term{exp,     coeff = 0} = []
+      showTerm' Term{exp = 0, coeff}     = [show coeff]
+      showTerm' Term{exp,     coeff}     = [show coeff <> "x^" <> show exp]
 
       instance Show Poly where
         show = coerce
-          (unwords . intersperse "+" . foldr (\(e, c) -> (<> showTerm e c)) [] . zip [0..])
+          (unwords . intersperse "+" . foldr (flip (<>) . showTerm') [] . zipWith Term [0..])
 
       addTerm :: Maybe Int -> Maybe Int -> Maybe Int
-      addTerm (coerce -> x) (coerce -> y) = coerce ((x <> y) :: Maybe (Sum Int))
+      addTerm x y = coerce @(Maybe (Sum Int)) (coerce x <> coerce y)
 
       addPoly :: Poly -> Poly -> Poly
       addPoly (Poly p1) (Poly p2) =
         Poly (catMaybes (takeWhile isJust (zipWith addTerm (fill p1) (fill p2))))
         where fill p = fmap Just p <> repeat Nothing
 
-      evalTerm :: Int -> Int -> Int -> Int
-      evalTerm v exp coeff = coeff * (v ^ exp)
+      evalTerm :: Int -> Term -> Int
+      evalTerm v Term{exp,coeff} = coeff * (v ^ exp)
 
       evalPoly :: Poly -> Int -> Int
       evalPoly (Poly p) x =
-        coerce (foldMap (Sum . uncurry (evalTerm x)) (zip [0..] p))
+        coerce (foldMap (Sum . evalTerm x) (zipWith Term [0..] p))
     #+end_src
 
 * Examples
@@ -102,15 +107,16 @@
 * Multiplication
 
   #+begin_src haskell
-    distributeTerm :: Poly -> Int -> Int -> Poly
-    distributeTerm p exp coeff  =
+    distributeTerm :: Poly -> Term -> Poly
+    distributeTerm p Term{exp,coeff}  =
       Poly (replicate exp 0 <> fmap (* coeff) (coerce p))
 
     distributePoly :: Poly -> Poly -> [Poly]
-    distributePoly p1 p2 = zipWith (distributeTerm p2) [0..] (coerce p1)
+    distributePoly p1 p2 = distributeTerm p2 <$> zipWith Term [0..] (coerce p1)
 
     multPoly :: Poly -> Poly -> Poly
-    multPoly p1 p2 = foldl' addPoly (Poly []) (distributePoly p1 p2)
+    multPoly p1 p2 =
+      coerce (fold (coerce @_ @[Sum Poly] (distributePoly p1 p2)))
   #+end_src
 
 * Are ~Poly~'s some kind of existing structure?
