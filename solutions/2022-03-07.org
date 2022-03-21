@@ -65,9 +65,10 @@
       terms = zipWith Term [0..] . coerce
 
       showTerm' :: (Num n, Eq n, Show n) => Term n -> [String]
-      showTerm' Term{exp,     coeff = 0} = []
-      showTerm' Term{exp = 0, coeff}     = [show coeff]
-      showTerm' Term{exp,     coeff}     = [show coeff <> "x^" <> show exp]
+      showTerm' Term{exp,     coeff =  0} = []
+      showTerm' Term{exp = 0, coeff     } = [show coeff]
+      showTerm' Term{exp = 1, coeff     } = [show coeff <> "x"]
+      showTerm' Term{exp,     coeff     } = [show coeff <> "x^" <> show exp]
 
       instance (Num n, Eq n, Show n) => Show (Poly n) where
         show =
