@@ -5,8 +5,10 @@
   #+begin_src haskell :session none
     {-# LANGUAGE ViewPatterns #-}
 
-    module Poly (Poly, toPoly, addPoly) where
+    module Poly where
+  #+end_src
 
+  #+begin_src haskell
     import Data.Coerce (coerce)
     import Data.Monoid (Sum (..))
     import Data.List (intersperse, foldl')
@@ -89,4 +91,39 @@
 
       example4 :: Poly
       example4 = toPoly [-1, 0, -2, 1]
+
+      example5 :: Poly
+      example5 = toPoly [1, -1]
+
+      example6 :: Poly
+      example6 = toPoly [1, 1]
     #+end_src
+
+* Multiplication
+
+  #+begin_src haskell
+    distributeTerm :: Poly -> Int -> Int -> Poly
+    distributeTerm p exp coeff  =
+      Poly (replicate exp 0 <> fmap (* coeff) (coerce p))
+
+    distributePoly :: Poly -> Poly -> [Poly]
+    distributePoly p1 p2 = zipWith (distributeTerm p2) [0..] (coerce p1)
+
+    multPoly :: Poly -> Poly -> Poly
+    multPoly p1 p2 = foldl' addPoly (Poly []) (distributePoly p1 p2)
+  #+end_src
+
+* Are ~Poly~'s some kind of existing structure?
+
+  This seems ok, but is kind of... not good?
+
+  #+begin_src haskell
+    instance Num Poly where
+      (+) = addPoly
+      (*) = multPoly
+      fromInteger = Poly . pure . fromInteger
+      negate (Poly p) = Poly (fmap negate p)
+       -- I don't know what these two are
+      abs = undefined
+      signum = undefined
+  #+end_src
